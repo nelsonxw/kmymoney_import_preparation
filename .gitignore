@@ -1,0 +1,22 @@
+# Environment variables (contains API keys and file paths)
+backend/.env
+
+# Python virtual environment
+backend/venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+
+# Node modules
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# User-specific CSV files in data/ (keep only sample files)
+data/*
+!data/.gitkeep
+!data/Category and Payee list.csv
+!data/Transactions history.csv
+
+# OS files
+.DS_Store
+Thumbs.db
