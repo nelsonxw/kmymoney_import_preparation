@@ -18,7 +18,7 @@ export default function ProgressBar({ loading, progress, progressMsg }) {
               Running AI Auto-Categorization
             </h4>
             <p className="text-xs text-indigo-700 font-medium">
-              {progressMsg || 'Processing transactions with Gemini 3.8 Flash...'}
+              {progressMsg || 'Processing transactions with OpenRouter (xingchen-agi/xing4.0-29b-a4b:free)...'}
             </p>
           </div>
         </div>

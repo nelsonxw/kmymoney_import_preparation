@@ -5,25 +5,22 @@ from typing import Dict, List, Optional, Any, Set
 from matching.normalizer import StringNormalizer
 
 
-class GeminiClassificationError(Exception):
-    """Raised when all Gemini AI models fail to respond."""
+OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+class OpenRouterClassificationError(Exception):
+    """Raised when the OpenRouter AI model fails to respond."""
     pass
 
 
-class GeminiService:
-    """Google Gemini Flash AI service for transaction classification."""
+class OpenRouterService:
+    """OpenRouter AI service for transaction classification."""
 
-    # Active Google Gemini models in order of preference
-    CANDIDATE_MODELS = [
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.5-flash",
-        "gemini-flash-latest",
-    ]
+    MODEL = "xingchen-agi/xing4.0-29b-a4b:free"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = httpx.Client(timeout=60.0)
+        self.client = httpx.Client(timeout=300.0)
 
     def classify_batch(
         self,
@@ -35,22 +32,22 @@ class GeminiService:
         progress_callback: Optional[Any] = None
     ) -> Dict[str, Dict[str, any]]:
         """
-        Classify unique transaction items using Google Gemini Flash.
+        Classify unique transaction items using OpenRouter.
         - Prioritizes matching against master_payees first (even with bank noise/abbreviations)
         - Analyzes payment amount patterns (ranges, averages) for payees with multiple categories
         - Constrains category strictly to master_categories or TBD
-        - Raises GeminiClassificationError if all candidate models fail
+        - Raises OpenRouterClassificationError if the model fails
         """
         if not batch_items:
             return {}
 
         if not self.api_key or not self.api_key.strip():
-            raise GeminiClassificationError(
-                "Gemini API key is not configured. Please add your key in Settings or the backend .env file."
+            raise OpenRouterClassificationError(
+                "OpenRouter API key is not configured. Please add your key in Settings or the backend .env file."
             )
 
         results_map: Dict[str, Dict[str, any]] = {}
-        chunk_size = 25
+        chunk_size = 10
         total_chunks = max(1, (len(batch_items) + chunk_size - 1) // chunk_size)
 
         for chunk_idx, i in enumerate(range(0, len(batch_items), chunk_size)):
@@ -58,11 +55,11 @@ class GeminiService:
                 progress_callback(
                     chunk_idx,
                     total_chunks,
-                    f"Querying Gemini 3.8 Flash (Batch {chunk_idx + 1} of {total_chunks})..."
+                    f"Querying OpenRouter {self.MODEL} (Batch {chunk_idx + 1} of {total_chunks})..."
                 )
 
             chunk = batch_items[i:i + chunk_size]
-            chunk_results = self._call_gemini_chunk(
+            chunk_results = self._call_openrouter_chunk(
                 chunk,
                 master_payees,
                 master_categories,
@@ -80,7 +77,7 @@ class GeminiService:
 
         return results_map
 
-    def _call_gemini_chunk(
+    def _call_openrouter_chunk(
         self,
         chunk: List[Dict[str, any]],
         master_payees: List[str],
@@ -88,66 +85,52 @@ class GeminiService:
         payee_to_categories: Dict[str, List[str]],
         payee_category_stats: Dict[str, Dict[str, Any]]
     ) -> Dict[str, Dict[str, any]]:
-        """Call Gemini for a single chunk of items with retry and fallback across models."""
+        """Call OpenRouter for a single chunk of items, retrying with backoff on temporary spikes (503/429)."""
         prompt = self._build_prompt(chunk, master_payees, master_categories, payee_to_categories, payee_category_stats)
         valid_categories = set(master_categories)
         master_payees_set = set(master_payees)
         master_payees_lower = {p.lower(): p for p in master_payees}
 
-        attempted_errors: List[str] = []
+        payload = {
+            "model": self.MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "max_tokens": 16000,
+            "response_format": {"type": "json_object"}
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}"}
 
-        for model in self.CANDIDATE_MODELS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
-            for attempt in range(2):  # Retry once on temporary spike (503/429)
-                try:
-                    response = self.client.post(
-                        url,
-                        json={
-                            "contents": [{"parts": [{"text": prompt}]}],
-                            "generationConfig": {
-                                "temperature": 0.1,
-                                "responseMimeType": "application/json"
-                            }
-                        }
+        for attempt in range(8):
+            try:
+                response = self.client.post(OPENROUTER_CHAT_URL, json=payload, headers=headers)
+            except httpx.HTTPError as e:
+                raise OpenRouterClassificationError(f"OpenRouter request failed: {e}. Please try again in a few moments.")
+
+            if response.status_code == 200:
+                message = response.json()['choices'][0]['message']
+                text = message.get('content') or message.get('reasoning_content') or ''
+                parsed = self._extract_json(text)
+                if parsed and 'results' in parsed:
+                    return self._sanitize_results(
+                        parsed['results'],
+                        chunk,
+                        valid_categories,
+                        master_payees_set,
+                        master_payees_lower
                     )
+                break
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        candidates = data.get('candidates', [])
-                        if candidates:
-                            text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                            parsed = self._extract_json(text)
-                            if parsed and 'results' in parsed:
-                                return self._sanitize_results(
-                                    parsed['results'],
-                                    chunk,
-                                    valid_categories,
-                                    master_payees_set,
-                                    master_payees_lower
-                                )
+            if response.status_code in (503, 429) and attempt < 7:
+                time.sleep(min(5 * 2 ** attempt, 60))
+                continue
+            break
 
-                    # If temporary spike (503 or 429), wait 1.5s and retry once
-                    if response.status_code in (503, 429) and attempt == 0:
-                        time.sleep(1.5)
-                        continue
-
-                    # Extract error details
-                    try:
-                        err_body = response.json().get('error', {})
-                        err_msg = err_body.get('message', response.text[:120])
-                    except Exception:
-                        err_msg = response.text[:120]
-
-                    attempted_errors.append(f"{model} (HTTP {response.status_code}: {err_msg})")
-                    break
-
-                except Exception as e:
-                    attempted_errors.append(f"{model} (Exception: {str(e)})")
-                    break
-
-        error_details = " | ".join(attempted_errors) if attempted_errors else "No response received"
-        raise GeminiClassificationError(
-            f"AI classification failed across all models ({', '.join(self.CANDIDATE_MODELS)}). Reason: {error_details}. Please try again in a few moments."
+        try:
+            err_msg = response.json().get('error', {}).get('message', response.text[:120])
+        except Exception:
+            err_msg = response.text[:120]
+        raise OpenRouterClassificationError(
+            f"AI classification failed ({self.MODEL}, HTTP {response.status_code}): {err_msg}. Please try again in a few moments."
         )
 
     def _build_prompt(

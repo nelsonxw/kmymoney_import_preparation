@@ -49,7 +49,7 @@ function App() {
   const handleSaveConfig = async () => {
     try {
       const formData = new FormData()
-      if (apiKey) formData.append('gemini_api_key', apiKey)
+      if (apiKey) formData.append('openrouter_api_key', apiKey)
       const res = await fetch(`${API_BASE}/config`, {
         method: 'POST',
         body: formData
@@ -70,7 +70,7 @@ function App() {
     if (masterListFile) formData.append('master_list_file', masterListFile)
 
     try {
-      const res = await fetch(`${API_BASE}/reference-files/load`, {
+      const res = await fetch(`${API_BASE}/reference/load`, {
         method: 'POST',
         body: formData
       })
@@ -246,6 +246,18 @@ function App() {
     }
   }
 
+  const handleStartNewImport = () => {
+    setTransactions([])
+    setUploadInfo(null)
+    setDateCol('')
+    setDescCol('')
+    setAmountCol('')
+    setFilter('all')
+    setSearchTerm('')
+    setSuccessMsg(null)
+    setError(null)
+  }
+
   // Derived counts
   const counts = useMemo(() => ({
     tbdCount: transactions.filter(tx => !tx.category || tx.category.toUpperCase() === 'TBD').length,
@@ -329,6 +341,7 @@ function App() {
           successMsg={successMsg}
           setSuccessMsg={setSuccessMsg}
           onRetry={handleProcessTransactions}
+          onNewImport={handleStartNewImport}
           loading={loading}
         />
 

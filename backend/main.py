@@ -20,7 +20,7 @@ from parsers.history_parser import HistoryParser
 from parsers.master_list import MasterListParser
 from parsers.transaction_parser import TransactionParser
 from matching.normalizer import StringNormalizer
-from ai.gemini_service import GeminiService, GeminiClassificationError
+from ai.openrouter_service import OpenRouterService, OpenRouterClassificationError
 
 # Default paths - use .env if set, otherwise fall back to data/ folder
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,7 +38,7 @@ class SessionState:
         self.original_filename: str = "transactions"
         self.history_path: str = DEFAULT_HISTORY_PATH
         self.master_list_path: str = DEFAULT_MASTER_LIST_PATH
-        self.gemini_api_key: Optional[str] = os.getenv('GEMINI_API_KEY')
+        self.openrouter_api_key: Optional[str] = os.getenv('OPENROUTER_API_KEY')
 
     def get_all_payees(self) -> List[str]:
         payees = set()
@@ -124,7 +124,7 @@ async def get_config():
     all_categories = session.get_all_categories()
 
     return {
-        "gemini_api_key_configured": bool(session.gemini_api_key and session.gemini_api_key.strip()),
+        "openrouter_api_key_configured": bool(session.openrouter_api_key and session.openrouter_api_key.strip()),
         "history_loaded": session.history_data is not None,
         "master_list_loaded": session.master_list_data is not None,
         "history_path": session.history_path,
@@ -141,13 +141,13 @@ async def get_config():
 
 @app.post("/api/config")
 async def update_config(
-    gemini_api_key: Optional[str] = Form(None),
+    openrouter_api_key: Optional[str] = Form(None),
     history_path: Optional[str] = Form(None),
     master_list_path: Optional[str] = Form(None)
 ):
     """Update configuration and reload files if paths changed."""
-    if gemini_api_key is not None:
-        session.gemini_api_key = gemini_api_key.strip()
+    if openrouter_api_key is not None:
+        session.openrouter_api_key = openrouter_api_key.strip()
 
     if history_path and history_path != session.history_path:
         session.history_path = history_path
@@ -348,7 +348,7 @@ def _distribute_ai_results(
                     'has_conflict': has_conflict,
                     'conflict_options': history_cats if has_conflict else [],
                     'confidence': confidence,
-                    'match_method': 'gemini_flash'
+                    'match_method': 'openrouter_llm'
                 })
         except Exception as e:
             print(f"Error distributing AI result for group {g_idx_str}: {e}")
@@ -379,7 +379,7 @@ async def process_transactions():
     amount_col = session.transaction_parser.amount_col or 'amount'
     date_col = session.transaction_parser.date_col or 'date'
 
-    has_api_key = bool(session.gemini_api_key and session.gemini_api_key.strip())
+    has_api_key = bool(session.openrouter_api_key and session.openrouter_api_key.strip())
 
     async def event_generator():
         loop = asyncio.get_running_loop()
@@ -443,11 +443,11 @@ async def process_transactions():
 
                 # Check API key requirement
                 if ai_candidate_groups and not has_api_key:
-                    raise GeminiClassificationError(
-                        "Gemini API Key is not configured. Please add your GEMINI_API_KEY in Settings or .env file to run AI categorization."
+                    raise OpenRouterClassificationError(
+                        "OpenRouter API Key is not configured. Please add your OPENROUTER_API_KEY in Settings or .env file to run AI categorization."
                     )
 
-                # AI-First Classification using Google Gemini Flash
+                # AI-First Classification using OpenRouter
                 if has_api_key and ai_candidate_groups:
                     group_keys = list(ai_candidate_groups.keys())
                     batch_items = [
@@ -460,8 +460,8 @@ async def process_transactions():
                         for g_idx, g_key in enumerate(group_keys)
                     ]
 
-                    gemini = GeminiService(session.gemini_api_key)
-                    ai_results = gemini.classify_batch(
+                    openrouter = OpenRouterService(session.openrouter_api_key)
+                    ai_results = openrouter.classify_batch(
                         batch_items,
                         master_payees=all_master_payees,
                         master_categories=all_master_categories,
@@ -469,7 +469,7 @@ async def process_transactions():
                         payee_category_stats=payee_category_stats,
                         progress_callback=progress_cb
                     )
-                    gemini.close()
+                    openrouter.close()
 
                     push_event({
                         "type": "progress",
@@ -495,7 +495,7 @@ async def process_transactions():
                     "transactions": processed
                 })
 
-            except GeminiClassificationError as e:
+            except OpenRouterClassificationError as e:
                 push_event({"type": "error", "detail": str(e)})
             except Exception as e:
                 push_event({"type": "error", "detail": f"AI categorization failed: {str(e)}"})
@@ -587,28 +587,29 @@ async def export_transactions():
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
 
-        new_approved_payees = []
-
         for tx in session.processed_transactions:
             row = dict(tx['original'])
             row['Payee'] = tx['payee']
             row['Category'] = tx['category']
             writer.writerow(row)
 
-            if tx.get('payee_is_new') and tx.get('payee'):
-                new_approved_payees.append(tx['payee'])
-
         csv_content = output.getvalue()
 
-        # Update master list with new payees if file exists
-        if new_approved_payees and Path(session.master_list_path).exists():
-            master_parser = MasterListParser(session.master_list_path)
-            master_parser.update(new_approved_payees)
-            session.master_list_data = master_parser.parse()
-            print(f"Updated master list with {len(new_approved_payees)} approved payees.")
+        master_path = Path(DEFAULT_MASTER_LIST_PATH)
+        if master_path.exists():
+            master_parser = MasterListParser(str(master_path))
+            master_parser.parse()
+            used_payees = {tx['payee'] for tx in session.processed_transactions if tx.get('payee') and tx['payee'].upper() != 'TBD'}
+            used_categories = {tx['category'] for tx in session.processed_transactions if tx.get('category') and tx['category'].upper() != 'TBD'}
+            new_payees = sorted(used_payees - master_parser.payees, key=str.casefold)
+            new_categories = sorted(used_categories - master_parser.categories, key=str.casefold)
+            if new_payees or new_categories:
+                master_parser.update(new_payees, new_categories)
+                session.master_list_data = master_parser.parse()
+                print(f"Master list updated: {len(new_payees)} new payees, {len(new_categories)} new categories.")
 
         # Save to temp file
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8-sig')
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8-sig', newline='')
         temp_file.write(csv_content)
         temp_file.close()
 

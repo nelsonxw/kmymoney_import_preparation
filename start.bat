@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set "PROJECT_DIR=%~dp0"
 set "BACKEND_DIR=%PROJECT_DIR%backend"
 set "FRONTEND_DIR=%PROJECT_DIR%frontend"
-set "VENV_DIR=%BACKEND_DIR%venv"
+set "VENV_DIR=%BACKEND_DIR%\venv"
 
 echo ========================================
 echo   AI Transaction Categorization App
@@ -35,7 +35,7 @@ if %errorlevel% neq 0 (
 for /f "tokens=*" %%i in ('node --version') do set "NODE_VERSION=%%i"
 echo [OK] Node.js %NODE_VERSION% found
 
-npm --version >nul 2>&1
+call npm --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] npm is not installed.
     pause
@@ -51,7 +51,7 @@ if not exist "%VENV_DIR%\Scripts\activate.bat" (
     echo [WARN] Python virtual environment not found at %VENV_DIR%
     echo Creating virtual environment...
     python -m venv "%VENV_DIR%"
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [ERROR] Failed to create virtual environment.
         pause
         exit /b 1
@@ -73,7 +73,7 @@ pip show fastapi >nul 2>&1
 if %errorlevel% neq 0 (
     echo [WARN] Backend packages not installed. Installing from requirements.txt...
     pip install -r "%BACKEND_DIR%\requirements.txt"
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [ERROR] Failed to install backend packages.
         pause
         exit /b 1
@@ -88,7 +88,7 @@ if not exist "%FRONTEND_DIR%\node_modules" (
     echo [WARN] Frontend node_modules not found. Installing dependencies...
     cd /d "%FRONTEND_DIR%"
     call npm install
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [ERROR] Failed to install frontend dependencies.
         pause
         exit /b 1
@@ -122,6 +122,9 @@ REM Start frontend in background
 cd /d "%FRONTEND_DIR%"
 start "Kmymoney Frontend" cmd /k "npm run dev"
 echo [STARTED] Frontend server on http://localhost:5173
+
+timeout /t 5 /nobreak >nul
+start "" http://localhost:5173
 
 echo.
 echo ========================================

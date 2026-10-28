@@ -77,8 +77,8 @@ class MasterListParser:
                     if c_clean and c_clean.upper() != 'TBD':
                         self.categories.add(c_clean)
 
-            sorted_payees = sorted(list(self.payees))
-            sorted_categories = sorted(list(self.categories))
+            sorted_payees = sorted(self.payees, key=str.casefold)
+            sorted_categories = sorted(self.categories, key=str.casefold)
 
             category_col = 'Category name'
             payee_col = 'Payee name'

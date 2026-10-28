@@ -1,13 +1,13 @@
 # AI Transaction Categorization Web App
 
-A web application for automatically categorizing bank/credit-card transactions for KMyMoney using AI (Google Gemini Flash) and existing transaction history.
+A web application for automatically categorizing bank/credit-card transactions for KMyMoney using AI (OpenRouter, `xingchen-agi/xing4.0-29b-a4b:free`) and existing transaction history.
 
 ## Features
 
 - **Import Transaction CSV**: Upload bank/credit-card transaction CSV files with automatic delimiter and column detection
 - **KMyMoney Integration**: Supports KMyMoney report export format and standard CSV formats
 - **Smart Payee Matching**: Multi-stage matching engine (exact, normalized, fuzzy) to maximize reuse of existing payees
-- **AI-Powered Classification**: Uses Google Gemini Flash (free tier) to identify new payees and suggest categories
+- **AI-Powered Classification**: Uses OpenRouter (`xingchen-agi/xing4.0-29b-a4b:free`) to identify new payees and suggest categories
 - **Interactive Review UI**: Edit transactions with autocomplete, filter by status, and sort by any column
 - **Visual Highlights**: Red highlighting for new payees and categories requiring attention
 - **Export Validation**: Blocks export if any transactions have TBD or missing categories
@@ -18,7 +18,7 @@ A web application for automatically categorizing bank/credit-card transactions f
 - **Backend**: FastAPI (Python 3.14+)
   - CSV parsers for KMyMoney reports and standard formats
   - Multi-stage matching engine with regex normalization and fuzzy matching
-  - Google Gemini Flash AI service with batching
+  - OpenRouter AI service with batching
   - In-memory session processing (no sensitive data persisted)
 - **Frontend**: React + Vite + Tailwind CSS
   - Interactive transaction review table
@@ -29,7 +29,7 @@ A web application for automatically categorizing bank/credit-card transactions f
 
 - Python 3.14+
 - Node.js 18+
-- Google Gemini API key (free tier available at https://makersuite.google.com/app/apikey)
+- OpenRouter API key (create one at https://openrouter.ai/keys)
 
 ## Setup
 
@@ -58,9 +58,9 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and add your Gemini API key:
+Edit `.env` and add your OpenRouter API key:
 ```
-GEMINI_API_KEY=your_gemini_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
 ### Frontend Setup
@@ -97,7 +97,7 @@ The React app will open at `http://localhost:5173`
 
 ## Usage
 
-1. **Configure API Key**: Click "Show Configuration" and enter your Gemini API key
+1. **Configure API Key**: Click "Settings & Files" and enter your OpenRouter API key
 2. **Load Reference Files**: Upload your Transaction History CSV and Category & Payee List CSV
    - Transaction History: KMyMoney report export or standard CSV with Payee/Category mappings
    - Category & Payee List: CSV with columns "Category name" and "Payee name"
@@ -160,7 +160,7 @@ Any bank/credit-card export format. The app auto-detects:
 
 **Frontend won't connect**: Ensure the FastAPI backend is running on `http://127.0.0.1:8000`
 
-**Gemini API errors**: Verify your API key is valid and has access to the Gemini Flash model
+**OpenRouter API errors**: Verify your API key is valid. HTTP 429 means you hit a OpenRouter rate limit; HTTP 503 means the service is temporarily overloaded
 
 **CORS errors**: The backend includes CORS middleware to allow requests from the frontend
 
@@ -169,7 +169,7 @@ Any bank/credit-card export format. The app auto-detects:
 ### Backend Structure
 - `backend/parsers/`: CSV parsers for history, master list, and transactions
 - `backend/matching/`: String normalizer and payee/category matching engine
-- `backend/ai/`: Gemini Flash AI service
+- `backend/ai/`: OpenRouter AI service
 - `backend/main.py`: FastAPI application and API endpoints
 
 ### Frontend Structure

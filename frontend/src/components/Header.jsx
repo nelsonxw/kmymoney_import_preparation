@@ -19,7 +19,7 @@ export default function Header({
               KMyMoney Transaction Categorizer
             </h1>
             <p className="text-xs text-slate-500">
-              AI-First Matching + Google Gemini Flash Free Tier
+              AI-First Matching + OpenRouter (xingchen-agi/xing4.0-29b-a4b:free)
             </p>
           </div>
         </div>
@@ -27,7 +27,12 @@ export default function Header({
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowConfig(!showConfig)}
-            className="text-xs px-3 py-1.5 font-medium rounded-md border border-slate-300 hover:bg-slate-100 transition"
+            aria-pressed={showConfig}
+            className={`text-xs px-3 py-1.5 font-medium rounded-md border transition ${
+              showConfig
+                ? 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700'
+                : 'border-slate-300 text-slate-900 hover:bg-slate-100'
+            }`}
           >
             ⚙️ Settings & Files
           </button>

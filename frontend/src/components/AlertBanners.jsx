@@ -6,6 +6,7 @@ export default function AlertBanners({
   successMsg,
   setSuccessMsg,
   onRetry,
+  onNewImport,
   loading
 }) {
   return (
@@ -33,7 +34,7 @@ export default function AlertBanners({
             </button>
           </div>
           <div className="flex items-center justify-between pt-1 border-t border-amber-200/60 text-xs text-amber-800">
-            <span>Google Gemini servers may be experiencing temporary traffic spikes. Please wait a minute and try again.</span>
+            <span>OpenRouter servers may be experiencing temporary traffic spikes. Please wait a minute and try again.</span>
             <button
               onClick={onRetry}
               disabled={loading}
@@ -48,9 +49,19 @@ export default function AlertBanners({
       {/* Success Notification */}
       {successMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-sm flex items-start justify-between">
-          <div>
-            <span className="font-semibold">Success: </span>
-            {successMsg}
+          <div className="flex items-center space-x-4">
+            <div>
+              <span className="font-semibold">Success: </span>
+              {successMsg}
+            </div>
+            {onNewImport && (
+              <button
+                onClick={onNewImport}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md text-xs shrink-0"
+              >
+                + Start New Import
+              </button>
+            )}
           </div>
           <button onClick={() => setSuccessMsg(null)} className="text-emerald-500 font-bold ml-4">
             ✕

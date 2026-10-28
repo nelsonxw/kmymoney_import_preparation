@@ -26,17 +26,17 @@ export default function ConfigModal({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Gemini API Key */}
+        {/* OpenRouter API Key */}
         <div className="space-y-2">
           <label className="block text-xs font-semibold text-slate-700 uppercase">
-            Google Gemini API Key (Free Tier)
+            OpenRouter API Key
           </label>
           <div className="flex space-x-2">
             <input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={config?.gemini_api_key_configured ? '•••••••••••••••• (Configured)' : 'Enter Gemini API key'}
+              placeholder={config?.openrouter_api_key_configured ? '•••••••••••••••• (Configured)' : 'Enter OpenRouter API key'}
               className="flex-1 text-sm px-3 py-2 border border-slate-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
             <button
@@ -47,7 +47,7 @@ export default function ConfigModal({
             </button>
           </div>
           <p className="text-xs text-slate-500">
-            Used for unresolved payees & categories. Free key from Google AI Studio.
+            Used for unresolved payees & categories. Create a key at openrouter.ai/keys.
           </p>
         </div>
 
@@ -67,9 +67,9 @@ export default function ConfigModal({
             </span>
           </div>
           <div className="flex justify-between">
-            <span>Gemini Flash Status:</span>
-            <span className={`font-medium ${config?.gemini_api_key_configured ? 'text-emerald-600' : 'text-amber-600'}`}>
-              {config?.gemini_api_key_configured ? '✓ Ready' : '⚠ API Key Missing'}
+            <span>OpenRouter Status:</span>
+            <span className={`font-medium ${config?.openrouter_api_key_configured ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {config?.openrouter_api_key_configured ? '✓ Ready' : '⚠ API Key Missing'}
             </span>
           </div>
         </div>
